@@ -1,4 +1,9 @@
+
 docker compose up -d
+
+**После `docker compose up -d` Можно запустить скрипт `./scripts/init.sh`**
+
+Порт 8081 (!) - http://localhost:8081/helloDoc/users
 
 # Инициализация CSRS
 docker compose exec -T cfg1 mongosh --port 27017 --quiet <<EOF

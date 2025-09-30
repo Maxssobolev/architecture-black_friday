@@ -17,7 +17,7 @@ services:
       MONGODB_DATABASE_NAME: "somedb"
       REDIS_URL: "redis://redis:6379"
     ports:
-      - "8080:8080"
+      - "8081:8080"
     networks: [app-net]
 
   cfg1:
