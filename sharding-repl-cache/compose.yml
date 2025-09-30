@@ -7,6 +7,7 @@ services:
       context: ./api_app
       dockerfile: Dockerfile
     restart: unless-stopped
+    image: kazhem/pymongo_api:1.0.0
     depends_on:
       mongos:
         condition: service_started

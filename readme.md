@@ -1,6 +1,8 @@
-1) docker compose up -d
+1) cd ./sharding-repl-cache
 
-2) **После `docker compose up -d` Можно запустить скрипт `./scripts/init.sh`**
+2) docker compose up -d
+
+3) **После `docker compose up -d` Можно запустить скрипт `./scripts/init.sh`**
 
 Порт 8081 (!) - http://localhost:8081/helloDoc/users
 
