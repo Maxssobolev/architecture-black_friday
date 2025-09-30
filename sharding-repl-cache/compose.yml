@@ -1,0 +1,263 @@
+name: sharding-repl-cache
+
+services:
+  pymongo-api:
+    container_name: pymongo-api-cache
+    build:
+      context: ./api_app
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    image: kazhem/pymongo_api:1.0.0
+    depends_on:
+      mongos:
+        condition: service_started
+      redis:
+        condition: service_started
+    environment:
+      MONGODB_URL: "mongodb://mongos:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://redis:6379"
+    ports:
+      - "8081:8080"
+    networks: [app-net]
+
+  cfg1:
+    image: mongo:latest
+    container_name: cfg1
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configRS",
+        "--bind_ip_all",
+        "--port",
+        "27017",
+      ]
+    ports: ["27117:27017"]
+    volumes: ["cfg1-data:/data/configdb"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27017 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  cfg2:
+    image: mongo:latest
+    container_name: cfg2
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configRS",
+        "--bind_ip_all",
+        "--port",
+        "27017",
+      ]
+    volumes: ["cfg2-data:/data/configdb"]
+    networks: [app-net]
+
+  cfg3:
+    image: mongo:latest
+    container_name: cfg3
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configRS",
+        "--bind_ip_all",
+        "--port",
+        "27017",
+      ]
+    volumes: ["cfg3-data:/data/configdb"]
+    networks: [app-net]
+
+  shard1-p:
+    image: mongo:latest
+    container_name: shard1-p
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1RS",
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    ports: ["27018:27018"]
+    volumes: ["shard1p-data:/data/db"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27018 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  shard1-s1:
+    image: mongo:latest
+    container_name: shard1-s1
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1RS",
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    volumes: ["shard1s1-data:/data/db"]
+    networks: [app-net]
+
+  shard1-s2:
+    image: mongo:latest
+    container_name: shard1-s2
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1RS",
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    volumes: ["shard1s2-data:/data/db"]
+    networks: [app-net]
+
+  shard2-p:
+    image: mongo:latest
+    container_name: shard2-p
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2RS",
+        "--bind_ip_all",
+        "--port",
+        "27019",
+      ]
+    ports: ["27019:27019"]
+    volumes: ["shard2p-data:/data/db"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27019 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  shard2-s1:
+    image: mongo:latest
+    container_name: shard2-s1
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2RS",
+        "--bind_ip_all",
+        "--port",
+        "27019",
+      ]
+    volumes: ["shard2s1-data:/data/db"]
+    networks: [app-net]
+
+  shard2-s2:
+    image: mongo:latest
+    container_name: shard2-s2
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2RS",
+        "--bind_ip_all",
+        "--port",
+        "27019",
+      ]
+    volumes: ["shard2s2-data:/data/db"]
+    networks: [app-net]
+
+  mongos:
+    image: mongo:latest
+    container_name: mongos
+    restart: unless-stopped
+    depends_on:
+      cfg1: { condition: service_healthy }
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "configRS/cfg1:27017,cfg2:27017,cfg3:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020",
+      ]
+    ports: ["27020:27020"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27020 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [app-net]
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [app-net]
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  cfg1-data:
+  cfg2-data:
+  cfg3-data:
+  shard1p-data:
+  shard1s1-data:
+  shard1s2-data:
+  shard2p-data:
+  shard2s1-data:
+  shard2s2-data:

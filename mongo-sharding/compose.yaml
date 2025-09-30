@@ -1,0 +1,147 @@
+name: mongo-sharding
+
+services:
+  pymongo-api:
+    container_name: pymongo-api
+    build:
+      context: ./api_app
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongos:
+        condition: service_started
+    environment:
+      MONGODB_URL: "mongodb://mongos:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+    ports:
+      - "8080:8080"
+    networks: [app-net]
+
+  configSrv:
+    image: mongo:latest
+    container_name: configSrv
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--configsvr",
+        "--replSet",
+        "configRS",
+        "--bind_ip_all",
+        "--port",
+        "27017",
+      ]
+    ports:
+      - "27117:27017"
+    volumes:
+      - config-data:/data/configdb
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27017 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  shard1:
+    image: mongo:latest
+    container_name: shard1
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard1RS",
+        "--bind_ip_all",
+        "--port",
+        "27018",
+      ]
+    ports:
+      - "27018:27018"
+    volumes:
+      - shard1-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27018 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  shard2:
+    image: mongo:latest
+    container_name: shard2
+    restart: unless-stopped
+    command:
+      [
+        "mongod",
+        "--shardsvr",
+        "--replSet",
+        "shard2RS",
+        "--bind_ip_all",
+        "--port",
+        "27019",
+      ]
+    ports:
+      - "27019:27019"
+    volumes:
+      - shard2-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27019 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+  mongos:
+    image: mongo:latest
+    container_name: mongos
+    restart: unless-stopped
+    depends_on:
+      configSrv:
+        condition: service_healthy
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "configRS/configSrv:27017",
+        "--bind_ip_all",
+        "--port",
+        "27020",
+      ]
+    ports:
+      - "27020:27020"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --port 27020 --eval 'db.runCommand({ ping: 1 })'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [app-net]
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  config-data:
+  shard1-data:
+  shard2-data:
